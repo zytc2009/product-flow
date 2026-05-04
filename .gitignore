@@ -1,0 +1,28 @@
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor backups
+*~
+*.swp
+*.swo
+
+# Python (for any future scripts)
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+
+# Node (for any future tooling)
+node_modules/
+npm-debug.log
+
+# Local working files (uncommitted drafts)
+*.local.md
