@@ -281,18 +281,80 @@ WON'T HAVE（明确不做）：
 
 ---
 
-## Self-review · 4 项扫描（HARD GATE 之前）
+## Self-review · 5 通道扫描（HARD GATE 之前）
 
-5 phase 跑完 + Phase 5 PRD 草稿生成后，agent 用"新眼光"扫一遍 PRD，逼自己找以下 4 类毛病。**这是 agent 自检，不需要用户参与**——就地修，无需重新评审。
+> 升级自原 4 项。借 MultiAgent (D:/whb/github/MultiAgent) 的 `spec_review.py` **5 通道确定性正则**思路——把"概念性扫描"换成"具体模式枚举"。
+> agent 用"新眼光"扫一遍 PRD 草稿，**这是 agent 自检，不需要用户参与**——就地修，无需重新评审。
 
-| 扫描项 | 怎么检 | 不通过怎么办 |
-|--------|------|-----------|
-| **placeholder 扫描** | 任何 "TBD" / "TODO" / "待定" / "暂时填" / "[xxx]"未填？acceptance 里有"待定阈值"？ | 就地填上，未填就退回相应 Phase |
-| **内部矛盾** | hypothesis ↔ stories ↔ MUST scope 是否一致？例：hypothesis 说"30 分钟"但 acceptance 说"≤ 5 分钟" | 找出矛盾，回相应 Phase 拉平 |
-| **scope 检查** | PRD 是否聚焦 1 个 hypothesis？还是塞了多个不相关的功能集？超过 1.5 页？ | scope 太宽就拆分；超过 1.5 页就压缩或砍 MUST |
-| **歧义检查** | acceptance criteria 可以被解读 2 种意思吗？sub-agent 看了能照做吗？例："系统正常运行" → 不可验证，必须改 | 改成可验证的具体语句 |
+### 通道 1 · Placeholders（blocking）
+
+扫这些**精确模式**，不止"感觉是 placeholder"：
+
+| 模式 | 例 |
+|------|---|
+| `\bTBD\b` (case-insensitive) | "thresholds: TBD" |
+| `\bTODO\b` (case-insensitive) | "// TODO: fill metric" |
+| `\bXXX\b` (case-insensitive) | "owner: XXX" |
+| `\?\?\?` 三个或更多问号 | "delay ≤ ??? ms" |
+| 中文：`待补充` / `待定` / `暂时填` | "metric 待定" |
+| 数字阈值缺失：acceptance 里 `≥ ?` / `≤ ?` / `?ms` / `?%` | "≥ ? 用户" |
+
+**任一命中 → blocking**，退回相应 Phase 填具体值。
+
+### 通道 2 · Weasel words / Vague verbs（blocking）
+
+不仅查 weasel words，还要查**正面但不可验证的 vague verb**——这种最隐蔽：
+
+| 类型 | 词列表 | 例 |
+|------|------|---|
+| **Weasel words**（不确定 hedging）| 可能 / 大概 / 或许 / 也许 / 尽量 / 应该 | "应该 ≤ 5 秒" |
+| **Vague verbs in acceptance**（正面 but 不可验证）| 正常运行 / 良好 / 顺畅 / 流畅 / 完善 / 完美 / 稳定 / 可靠 / 易用 / 快速 | "Then 系统稳定运行" / "Then 用户体验流畅" |
+
+**Vague verb 的特殊规则**：在 GWT 的 THEN 子句中**必须搭配数字 / 具体动作**，否则 = blocking。
+例：
+- ❌ "Then 系统稳定运行" → 退回
+- ✅ "Then 系统响应 ≤ 200ms 且 5xx ≤ 0.1%" → 通过
+
+注意 RFC 2119 关键字（SHALL / MUST / SHOULD）在英文 spec 里是**精确**的，**不算 weasel**。
+
+### 通道 3 · Scope（advisory · 不 block 但记账）
+
+| 检查 | 阈值（参考 MultiAgent 经验值）| 不通过怎么办 |
+|------|------|-----------|
+| PRD 总字符数 | > 10,000 字符 → warn | 建议拆子需求 / 砍 MUST |
+| Requirement 数量 | > 10 个 → warn | 建议拆子需求 |
+| MUST 列表 | > 5 个（D 段 Phase 4 硬规则）| 退回 Phase 4 砍 50% |
+| 是否聚焦 1 个 hypothesis | 多 hypothesis 混在一起 | 退回 Phase 1 拆 |
+
+### 通道 4 · Consistency（blocking）
+
+| 检查 | 怎么检 | 不通过怎么办 |
+|------|------|-----------|
+| Requirement 标题重复 | 正则 `^### Requirement: (.+)$` 后 dedupe | 合并或改名 |
+| 内部矛盾 | hypothesis ↔ stories ↔ MUST scope 数字一致吗？例：hypothesis "30 分钟" vs acceptance "≤ 5 秒" | 退回相应 Phase 拉平 |
+| Frame ↔ PRD 引用不漏 | persona 名 / JTBD 句式 / tagline 应该在 PRD 出现 | 找出漏点，加进去 |
+
+### 通道 5 · Anti-patterns（blocking · content-quality）
+
+正则 + 模式扫描以下"**机械通道扫不到的内容质量问题**"：
+
+| 反模式 | 怎么检 |
+|------|------|
+| **必填章节为空** | `## 不做的事 / Out of Scope` / `## 成功指标 / Success Metrics` / `## 背景与动机 / Strategic Context` 段缺失或仅写"待补充"/"TBD" |
+| **OoS 偷懒** | "## 不做的事" body 仅写 "无" / "无。" / "None" / "- 无"（无任何说明） |
+| **Success Metrics 无数字** | 段 body 不含任何 `\d`（ baseline / goal 不可量化）|
+| **Scenario 缺 GWT** | `#### Scenario:` 块缺 WHEN 或 THEN 关键字 |
+| **acceptance 写实现细节** | acceptance 出现"调用 X API" / "查询 Y 表" / "返回 JSON" 等技术细节 → 退回（应该是用户视角，不是实现） |
+
+---
 
 修完毛病再进 HARD GATE。
+
+**实现提示**（如果 agent 在能跑代码的环境）：
+- placeholder / weasel / scope / consistency 4 通道适合**确定性正则**实现（参考 `D:/whb/github/MultiAgent/backend/spec_review.py`）
+- anti-patterns 通道也是正则 + 章节切分
+- 5 通道里 1/2/4/5 是 blocking，3 是 advisory
+- 自检不调用 LLM，**确定性 + 快速**，可以反复跑（每次 PRD 修改后自动重审）
 
 ---
 
