@@ -1,0 +1,15 @@
+{
+  "name": "product-flow",
+  "description": "5-stage product development pipeline: spark → audit → frame → spec → verdict. Combines PM frameworks (Geoffrey Moore, JTBD, MITRE) with Steve Jobs taste-testing and superpowers' brainstorming protocol.",
+  "version": "0.1.0",
+  "license": "MIT",
+  "keywords": [
+    "product-management",
+    "product-discovery",
+    "positioning",
+    "audit",
+    "framework",
+    "jobs-to-be-done",
+    "skill-pipeline"
+  ]
+}
